@@ -1,13 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 import requests
 import os
 from dotenv import load_dotenv
 from fastapi.responses import HTMLResponse
+from auth import init_auth_db, register_user, login_user
+init_auth_db()
 
 # Load environment variables
 load_dotenv()
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
 
 app = FastAPI(title="Medical Chatbot API")
 
@@ -115,3 +118,22 @@ async def add_reminder(reminder: Reminder):
 @app.get("/get-reminders")
 async def get_reminders():
     return {"reminders": reminders_db}
+
+class UserCredentials(BaseModel):
+    username: str
+    password: str
+    
+@app.post("/register")
+async def register(credentials: UserCredentials):
+    if register_user(credentials.username, credentials.password):
+        return {"message": "Registration successful"}
+    else:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+@app.post("/login")
+async def login(credentials: UserCredentials):
+    if login_user(credentials.username, credentials.password):
+        return {"message": "Login successful"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
