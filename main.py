@@ -95,3 +95,23 @@ async def chat(msg: Message):
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "model": "deepseek-chat"}
+
+
+# Add these models
+class Reminder(BaseModel):
+    medication: str
+    dosage: str
+    time: str  # Format: "HH:MM"
+    days: list[str]  # e.g., ["Mon", "Wed", "Fri"]
+
+# In-memory storage (replace with database later)
+reminders_db = []
+
+@app.post("/add-reminder")
+async def add_reminder(reminder: Reminder):
+    reminders_db.append(reminder.dict())
+    return {"message": "Reminder set successfully"}
+
+@app.get("/get-reminders")
+async def get_reminders():
+    return {"reminders": reminders_db}
