@@ -122,18 +122,43 @@ async def get_reminders():
 class UserCredentials(BaseModel):
     username: str
     password: str
+    full_name: str = ""
+    age: int = 0
+    email: str = ""
+
+class UserData(BaseModel):
+    username: str
+    full_name: str
+    age: int
+    email: str
     
 @app.post("/register")
 async def register(credentials: UserCredentials):
-    if register_user(credentials.username, credentials.password):
-        return {"message": "Registration successful"}
-    else:
-        raise HTTPException(status_code=400, detail="Username already exists")
+    try:
+        if register_user(
+            credentials.username, 
+            credentials.password,
+            credentials.full_name,
+            credentials.age,
+            credentials.email
+        ):
+            return {"status": "success", "message": "Registration successful"}
+        else:
+            return {"status": "error", "detail": "Username already exists"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 @app.post("/login")
 async def login(credentials: UserCredentials):
-    if login_user(credentials.username, credentials.password):
-        return {"message": "Login successful"}
+    user_data = login_user(credentials.username, credentials.password)
+    if user_data:
+        return {
+            "message": "Login successful",
+            "username": user_data.get("username", ""),
+            "full_name": user_data.get("full_name", ""),
+            "age": user_data.get("age", ""),
+            "email": user_data.get("email", "")
+        }
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 

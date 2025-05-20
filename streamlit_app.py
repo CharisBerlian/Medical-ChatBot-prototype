@@ -46,7 +46,7 @@ def auth_section():
           <span class='welcome-text'>Welcome to</span>
           <span class='app-name'>HealthPal</span>
         </h2>
-        <p class='auth-subtitle'>Your trusted AI health companion 💊</p>
+        <p class='auth-subtitle'>Your trusted AI health companion</p>
       </div>
     """, unsafe_allow_html=True)
 
@@ -64,28 +64,64 @@ def auth_section():
                     json={"username": username, "password": password}
                 )
                 if res.status_code == 200:
+                    user_data = res.json()
+                    # Debug information
+                    st.write("Debug - Login Response:", user_data)
+                    
                     st.session_state.logged_in = True
                     st.session_state.username = username
+                    st.session_state.full_name = user_data.get('full_name', 'Not provided')
+                    st.session_state.age = user_data.get('age', 'Not provided')
+                    st.session_state.email = user_data.get('email', 'Not provided')
+                    
+                    # Debug information
+                    st.write("Debug - Session State:", {
+                        'full_name': st.session_state.get('full_name'),
+                        'age': st.session_state.get('age'),
+                        'email': st.session_state.get('email')
+                    })
+                    
                     st.success("✅ Login successful! Redirecting...")
                     st.rerun()
                 else:
                     st.error("❌ Invalid username or password")
 
     with tab_register:
-        new_user = st.text_input("Username", key="reg_user")
-        new_pass = st.text_input("Password", type="password", key="reg_pass")
+        full_name = st.text_input("Full Name", key="reg_name")
+        age = st.number_input("Age", min_value=1, max_value=120, value=18, key="reg_age")
+        email = st.text_input("Email", key="reg_email")
+        new_user = st.text_input("Username", key="reg_user", 
+                                help="Username must be at least 5 characters long")
+        new_pass = st.text_input("Password", type="password", key="reg_pass", 
+                                help="Password must be at least 8 characters long")
+        
         if st.button("Register", use_container_width=True):
-            if not new_user or not new_pass:
-                st.warning("Please fill in both fields.")
+            if not new_user or not new_pass or not full_name:
+                st.warning("Please fill in all required fields.")
+            elif len(new_user) < 5:
+                st.error("Username must be at least 5 characters long.")
+            elif len(new_pass) < 8:
+                st.error("Password must be at least 8 characters long.")
             else:
-                res = requests.post(
-                    "http://localhost:8000/register",
-                    json={"username": new_user, "password": new_pass}
-                )
-                if res.status_code == 200:
-                    st.success("🎉 Registered successfully! You can now log in.")
-                else:
-                    st.error(res.json().get("detail", "Registration failed"))
+                try:
+                    res = requests.post(
+                        "http://localhost:8000/register",
+                        json={
+                            "username": new_user,
+                            "password": new_pass,
+                            "full_name": full_name,
+                            "age": age,
+                            "email": email
+                        }
+                    )
+                    response_data = res.json()
+                    
+                    if response_data.get("status") == "success":
+                        st.success("Registered successfully! You can now log in.")
+                    else:
+                        st.error(response_data.get("detail", "Registration failed"))
+                except Exception as e:
+                    st.error(f"Registration failed: {str(e)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -99,9 +135,24 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
 
 if "logged_in" in st.session_state and st.session_state.logged_in:
     with st.sidebar:
-        st.write(f"Logged in as: **{st.session_state.username}**")
+        st.markdown("""
+        <div style='text-align: center; padding: 1rem 0;'>
+            <h1 style='color: #6c63ff; font-size: 2rem; margin: 0;'>HealthPal</h1>
+            <p style='color: #cccccc; margin: 0.5rem 0;'>Your trusted AI health companion</p>
+        </div>
+        """, unsafe_allow_html=True)
         st.markdown("---")
-        if st.button("🚪 Log Out"):
+        
+        # User Profile Section
+        st.markdown(f"### 👤 {st.session_state.get('username', 'User')}")
+        st.markdown(f"""
+        **Name:** {st.session_state.get('full_name', 'Not provided')}  
+        **Age:** {st.session_state.get('age', 'Not provided')}  
+        **Email:** {st.session_state.get('email', 'Not provided')}
+        """)
+        
+        st.markdown("---")
+        if st.button("🚪 Log Out", use_container_width=True):
             st.session_state.clear()
             st.rerun()
 
@@ -113,6 +164,9 @@ if "messages" not in st.session_state:
 
 if "reminders" not in st.session_state:
     st.session_state.reminders = []
+
+if "medical_history" not in st.session_state:
+    st.session_state.medical_history = []
 
 # --- Reminder Scheduler Thread ---
 def check_reminders():
@@ -132,10 +186,10 @@ if not hasattr(st.session_state, 'scheduler_thread'):
     st.session_state.scheduler_thread.start()
 
 # --- App Layout ---
-tab1, tab2 = st.tabs(["Medical Chatbot", "Medication Reminder"])
+tab1, tab2, tab3 = st.tabs(["Medical Chatbot", "Medication Reminder", "Medical History"])
 
 with tab1:
-    st.header("🩺 Medical Chatbot")
+    st.header("💬 Medical Chatbot")
     st.write("Ask me anything about general health, symptoms, or medications.")
 
     for message in st.session_state.messages:
@@ -165,7 +219,8 @@ with tab2:
         with st.form("reminder_form"):
             med = st.text_input("Medication Name", placeholder="e.g., Ibuprofen")
             dose = st.text_input("Dosage", placeholder="e.g., 200mg")
-            reminder_time = st.time_input("Time", value=time(8, 0))  # Fixed: uses datetime.time
+            reminder_time = st.time_input("Time", value=time(8, 0))
+            notes = st.text_area("Additional Notes", placeholder="Any additional information")
             days = st.multiselect(
                 "Repeat Days",
                 ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -177,30 +232,73 @@ with tab2:
                     "medication": med,
                     "dosage": dose,
                     "time": reminder_time.strftime("%H:%M"),
-                    "days": days
+                    "days": days,
+                    "notes": notes
                 }
                 st.session_state.reminders.append(new_reminder)
                 st.success(f"Reminder set for {reminder_time.strftime('%I:%M %p')} on {', '.join(days)}")
+                st.rerun()
     
     # Display current reminders
     st.subheader("Your Active Reminders")
     if not st.session_state.reminders:
         st.info("No reminders set yet")
     else:
-        for i, reminder in enumerate(st.session_state.reminders):
-            cols = st.columns([3, 1])
-            with cols[0]:
+        # Sort reminders by time
+        sorted_reminders = sorted(st.session_state.reminders, key=lambda x: x['time'])
+        
+        for i, reminder in enumerate(sorted_reminders):
+            with st.expander(f"**{reminder['medication']}**"):
                 st.markdown(f"""
-                **{reminder['medication']}**  
-                Dosage: {reminder['dosage']}  
-                Time: {reminder['time']}  
-                Days: {', '.join(reminder['days'])}
+                **Dosage:** {reminder['dosage']}  
+                **Time:** {reminder['time']}  
+                **Days:** {', '.join(reminder['days'])}  
+                **Notes:** {reminder.get('notes', '-')}
                 """)
-            with cols[1]:
-                if st.button("❌", key=f"delete_{i}"):
+                if st.button("Delete Reminder", key=f"delete_{i}"):
                     st.session_state.reminders.pop(i)
+                    st.rerun()
+
+with tab3:
+    st.header("📋 Medical History")
+    
+    with st.expander("➕ Add New Medical Record"):
+        with st.form("medical_history_form"):
+            record_type = st.selectbox(
+                "Record Type",
+                ["Condition", "Allergy", "Surgery", "Vaccination", "Other"]
+            )
+            description = st.text_area("Description", placeholder="Enter details about your medical record")
+            date = st.date_input("Date", value=datetime.now().date())
+            notes = st.text_area("Additional Notes", placeholder="Any additional information")
+            
+            if st.form_submit_button("Add Record"):
+                new_record = {
+                    "type": record_type,
+                    "description": description,
+                    "date": date.strftime("%Y-%m-%d"),
+                    "notes": notes
+                }
+                st.session_state.medical_history.append(new_record)
+                st.success("Medical record added successfully!")
+    
+    # Display medical history
+    st.subheader("Your Medical Records")
+    if not st.session_state.medical_history:
+        st.info("No medical records added yet")
+    else:
+        for i, record in enumerate(st.session_state.medical_history):
+            with st.expander(f"**{record['type']}**   -   **{record['date']}**"):
+                st.markdown(f"""
+                **Description:** {record['description']}  
+                **Date:** {record['date']}  
+                **Notes:** {record.get('notes', '-')}
+                """)
+                if st.button("Delete Record", key=f"delete_record_{i}"):
+                    st.session_state.medical_history.pop(i)
                     st.rerun()
 
 # --- Run the App ---
 if __name__ == "__main__":
-    st.info("Note: The FastAPI backend must be running at http://localhost:8000")
+    # st.info("Note: The FastAPI backend must be running at http://localhost:8000")
+    st.info("HealthPal")
