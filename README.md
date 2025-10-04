@@ -15,7 +15,7 @@ HealthPal is a comprehensive health management application designed to be your t
 🎥 Demonstration
 Here is a video walkthrough of the HealthPal application:
 
-(You can upload your 2025-05-20 22-09-41.mp4 video to your GitHub repository and link it here)
+[(here)](https://youtu.be/UWe17sve0Bk)
 
 🛠️ Tech Stack
 Backend: FastAPI, Python
